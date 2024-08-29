@@ -24,6 +24,7 @@ def load_random_article() -> tuple[str, str]:
 
 
 def get_article_title(article_url: str) -> str:
+    logger.info(f"get_article_title: {article_url}")
     from_pos = len("https://en.wikipedia.org/wiki/")
     article_title = article_url[from_pos:]
     return article_title
