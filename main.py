@@ -44,7 +44,7 @@ def show_article(url: str):
     sp.run(["open", "/Applications/Safari.app", url])
 
 def main():
-    logger.info("starting main()...")
+    logger.debug("starting main()...")
     while True:
         url, html = load_random_article()
         title = get_article_title(url)
