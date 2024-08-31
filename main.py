@@ -1,7 +1,8 @@
 import logging
-
-import requests
+import enum
 import subprocess as sp
+from typing import Optional 
+import requests
 
 LOGFILE = "wikiarticle_runner.log"
 
@@ -30,31 +31,79 @@ def get_article_title(article_url: str) -> str:
     return article_title
 
 
-def user_choice(art_title: str) -> bool:
+
+
+
+class UserChoice(enum.Enum):
+    READ = 1
+    SKIP = 2
+    DEFER = 3
+    DEFERRED = 4
+    EXIT = 5
+
+
+def user_choice(art_title: str) -> UserChoice:
     print(f"Тебе интересна эта статья: {art_title}?")
+    print(f"Варианты ответа: читать - {UserChoice.READ.value}, "
+          f"пропустить - {UserChoice.SKIP.value}, "
+          f"отложить - {UserChoice.DEFER.value}, "
+          f"посмотреть рандомную отложенную статью - {UserChoice.DEFERRED.value}, "
+          f"выйти - {UserChoice.EXIT.value}")
     while True:
-        b = input()
-        if b == "да":
-            return True
-        elif b == "нет":
-            return False
-        else:
-            print("Я понимаю только 'да' и 'нет'. Повторите ответ")
+        try: 
+            b = int(input())
+            for x in UserChoice: 
+                if b == x.value:
+                    return x
+            raise ValueError()
+        except ValueError:
+            print("Я понимаю только перечисленные выше цифровые варианты. "
+                  "Введите верный вариант")
+            
         
 def show_article(url: str):
     sp.run(["open", "/Applications/Safari.app", url])
 
+
+deferred_articles: dict[str, int] = {}
+def defer_article(url: str):
+    deferred_articles[url] = 1
+
+def pop_deferred_article() -> Optional[str]:
+    try:
+        return deferred_articles.popitem()[0]
+    except KeyError:
+        return None
+
+
 def main():
     logger.debug("starting main()...")
     while True:
-        url, html = load_random_article()
+        url, _html = load_random_article()
         title = get_article_title(url)
         choice = user_choice(title)
-        if choice:
+        if choice == UserChoice.READ:
             show_article(url)
-        print("Продолжаем выбирать статью?")
-        ans = input()
-        if ans == "нет":
+        if choice == UserChoice.SKIP:
+            pass
+        if choice == UserChoice.DEFER:
+            defer_article(url)
+        if choice == UserChoice.DEFERRED:
+            url2 = pop_deferred_article()
+            if url2 != None:
+                while True:
+                    choice2 = input(f"Вам интересна эта статья (да/нет)? {get_article_title(url2)}: ")
+                    if choice2 == "да":
+                        show_article(url2)
+                        break
+                    elif choice2 == "нет":
+                        break
+                    else:
+                        print("Я понимаю только 'да' и 'нет'. Повторите ответ")
+            else:
+                print("В отложенных пока ничего нет :)")
+
+        if choice == UserChoice.EXIT:
             break
 
 
