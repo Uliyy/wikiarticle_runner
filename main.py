@@ -5,6 +5,9 @@ from typing import Optional
 import requests
 
 LOGFILE = "wikiarticle_runner.log"
+DEFERRED_ARTICLES_FILE = "deferred_articles.txt"
+
+deferred_articles: dict[str, int] = {}
 
 logging.basicConfig(filename=LOGFILE, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -65,15 +68,37 @@ def show_article(url: str):
     sp.run(["open", "/Applications/Safari.app", url])
 
 
-deferred_articles: dict[str, int] = {}
+
 def defer_article(url: str):
     deferred_articles[url] = 1
+
 
 def pop_deferred_article() -> Optional[str]:
     try:
         return deferred_articles.popitem()[0]
     except KeyError:
         return None
+
+
+def load_deferred_articles() -> dict[str, int]:
+    try: 
+        f = open(DEFERRED_ARTICLES_FILE, "r")
+        d: dict[str, int] = {}
+        s = f.readline()
+        while s != '':
+            d[s[:-1]] = 1
+            s = f.readline()
+        f.close()
+        return d
+    except FileNotFoundError:
+        return {}
+
+
+def save_deferred_articles(d: dict[str, int]):
+    f = open(DEFERRED_ARTICLES_FILE, "w")
+    f.writelines([key + "\n" for key in d.keys()])
+    f.close()
+
 
 
 def main():
@@ -107,9 +132,11 @@ def main():
             break
 
 
-
 if __name__ == '__main__':
     try:
+        deferred_articles = load_deferred_articles()
         main()
     except Exception as e:
         logger.error(e)
+    finally:
+        save_deferred_articles(deferred_articles)
