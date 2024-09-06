@@ -1,7 +1,7 @@
 import logging
 import enum
 import subprocess as sp
-from typing import Optional 
+from typing import Optional
 import requests
 
 LOGFILE = "wikiarticle_runner.log"
@@ -15,26 +15,33 @@ logger = logging.getLogger(__name__)
 RANDOM_ARTICLE_URL = "https://en.wikipedia.org/wiki/Special:Random"
 
 
-def load_random_article() -> tuple[str, str]:
+class Article:
+    def __init__(self, url: str) -> None:
+        self._url = url
+
+    def get_title(self) -> str:
+        logger.info(f"get_article_title: {self._url}")
+        from_pos = len("https://en.wikipedia.org/wiki/")
+        article_title = self._url[from_pos:]
+        return article_title
+
+    def show(self):
+        sp.run(["open", "/Applications/Safari.app", self._url])
+
+    def get_url(self) -> str:
+        return self._url
+
+
+def load_random_article() -> Article:
     logger.info("load_random_article")
     req1 = requests.request("GET", RANDOM_ARTICLE_URL, allow_redirects=False)
     if req1.status_code != 302:
         raise Exception("Вики недоступна")
-    loc = req1.headers['location']
+    loc = req1.headers["location"]
     req2 = requests.request("GET", loc)
     if req2.status_code != 200:
         raise Exception("Вики недоступна")
-    return loc, req2.text
-
-
-def get_article_title(article_url: str) -> str:
-    logger.info(f"get_article_title: {article_url}")
-    from_pos = len("https://en.wikipedia.org/wiki/")
-    article_title = article_url[from_pos:]
-    return article_title
-
-
-
+    return Article(loc)
 
 
 class UserChoice(enum.Enum):
@@ -47,45 +54,45 @@ class UserChoice(enum.Enum):
 
 def user_choice(art_title: str) -> UserChoice:
     print(f"Тебе интересна эта статья: {art_title}?")
-    print(f"Варианты ответа: читать - {UserChoice.READ.value}, "
-          f"пропустить - {UserChoice.SKIP.value}, "
-          f"отложить - {UserChoice.DEFER.value}, "
-          f"посмотреть рандомную отложенную статью - {UserChoice.DEFERRED.value}, "
-          f"выйти - {UserChoice.EXIT.value}")
+    print(
+        f"Варианты ответа: читать - {UserChoice.READ.value}, "
+        f"пропустить - {UserChoice.SKIP.value}, "
+        f"отложить - {UserChoice.DEFER.value}, "
+        f"посмотреть рандомную отложенную статью - {UserChoice.DEFERRED.value}, "
+        f"выйти - {UserChoice.EXIT.value}"
+    )
     while True:
-        try: 
+        try:
             b = int(input())
-            for x in UserChoice: 
+            for x in UserChoice:
                 if b == x.value:
                     return x
             raise ValueError()
         except ValueError:
-            print("Я понимаю только перечисленные выше цифровые варианты. "
-                  "Введите верный вариант")
-            
-        
-def show_article(url: str):
-    sp.run(["open", "/Applications/Safari.app", url])
+            print(
+                "Я понимаю только перечисленные выше цифровые варианты. "
+                "Введите верный вариант"
+            )
 
 
+def defer_article(article: Article):
+    deferred_articles[article.get_url()] = 1
 
-def defer_article(url: str):
-    deferred_articles[url] = 1
 
-
-def pop_deferred_article() -> Optional[str]:
+def pop_deferred_article() -> Optional[Article]:
     try:
-        return deferred_articles.popitem()[0]
+        url = deferred_articles.popitem()[0]
+        return Article(url)
     except KeyError:
         return None
 
 
 def load_deferred_articles() -> dict[str, int]:
-    try: 
+    try:
         f = open(DEFERRED_ARTICLES_FILE, "r")
         d: dict[str, int] = {}
         s = f.readline()
-        while s != '':
+        while s != "":
             d[s[:-1]] = 1
             s = f.readline()
         f.close()
@@ -100,26 +107,27 @@ def save_deferred_articles(d: dict[str, int]):
     f.close()
 
 
-
 def main():
     logger.debug("starting main()...")
     while True:
-        url, _html = load_random_article()
-        title = get_article_title(url)
+        article = load_random_article()
+        title = article.get_title()
         choice = user_choice(title)
         if choice == UserChoice.READ:
-            show_article(url)
+            article.show()
         if choice == UserChoice.SKIP:
             pass
         if choice == UserChoice.DEFER:
-            defer_article(url)
+            defer_article(article)
         if choice == UserChoice.DEFERRED:
-            url2 = pop_deferred_article()
-            if url2 != None:
+            article2 = pop_deferred_article()
+            if article2 != None:
                 while True:
-                    choice2 = input(f"Вам интересна эта статья (да/нет)? {get_article_title(url2)}: ")
+                    choice2 = input(
+                        f"Вам интересна эта статья (да/нет)? {article2.get_title()}: "
+                    )
                     if choice2 == "да":
-                        show_article(url2)
+                        article2.show()
                         break
                     elif choice2 == "нет":
                         break
@@ -132,7 +140,7 @@ def main():
             break
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         deferred_articles = load_deferred_articles()
         main()
