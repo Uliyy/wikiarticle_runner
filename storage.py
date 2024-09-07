@@ -3,9 +3,6 @@ from typing import Optional
 from article import Article
 
 
-DEFERRED_ARTICLES_FILE = "deferred_articles.txt"
-
-
 class BaseStorage:
     def __init__(self):
         pass
@@ -21,17 +18,18 @@ class BaseStorage:
 
 
 class FileStorage(BaseStorage):
-    def __init__(self):
+    def __init__(self, filename: str):
         super().__init__()
+        self.filename = filename
         try:
             self._articles: dict[str, int] = {}
-            for line in open(DEFERRED_ARTICLES_FILE, "rt"):
+            for line in open(filename, "rt"):
                 self._articles[line[:-1]] = 1
         except FileNotFoundError:
             pass
 
     def done(self):
-        f = open(DEFERRED_ARTICLES_FILE, "w")
+        f = open(self.filename, "w")
         f.writelines([key + "\n" for key in self._articles.keys()])
         f.close()
 

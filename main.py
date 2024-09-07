@@ -91,9 +91,10 @@ def main(storage: BaseStorage):
 
 
 if __name__ == "__main__":
+
     storage = None
     try:
-        storage = FileStorage()
+        storage = FileStorage(DEFERRED_ARTICLES_FILE)
         main(storage)
     except Exception as e:
         logger.error(e)
