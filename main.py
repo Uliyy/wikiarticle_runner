@@ -1,8 +1,9 @@
 import logging
 import enum
-import subprocess as sp
-from typing import Optional
 import requests
+
+from storage import BaseStorage, FileStorage
+from article import Article
 
 LOGFILE = "wikiarticle_runner.log"
 DEFERRED_ARTICLES_FILE = "deferred_articles.txt"
@@ -11,63 +12,6 @@ logging.basicConfig(filename=LOGFILE, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 RANDOM_ARTICLE_URL = "https://en.wikipedia.org/wiki/Special:Random"
-
-
-class Article:
-    def __init__(self, url: str) -> None:
-        self._url = url
-
-    def get_title(self) -> str:
-        logger.info(f"get_article_title: {self._url}")
-        from_pos = len("https://en.wikipedia.org/wiki/")
-        article_title = self._url[from_pos:]
-        return article_title
-
-    def show(self):
-        sp.run(["open", "/Applications/Safari.app", self._url])
-
-    def get_url(self) -> str:
-        return self._url
-
-
-class BaseStorage:
-    def __init__(self):
-        pass
-
-    def done(self) -> None:
-        raise NotImplementedError("this method should be implemented in derived class")
-    
-    def defer_article(self, article: Article) -> None:
-        raise NotImplementedError("this method should be implemented in derived class")
-    
-    def pop_deferred_article(self) -> Optional[Article]:
-        raise NotImplementedError("this method should be implemented in derived class")
-
-
-class FileStorage(BaseStorage):
-    def __init__(self):
-        super().__init__()
-        try:
-            self._articles: dict[str, int] = {}
-            for line in open("deferred_articles.txt", "rt"):
-                self._articles[line[:-1]] = 1
-        except FileNotFoundError:
-            pass
-
-    def done(self):
-        f = open(DEFERRED_ARTICLES_FILE, "w")
-        f.writelines([key + "\n" for key in self._articles.keys()])
-        f.close()
-    
-    def defer_article(self, article: Article):
-        self._articles[article.get_url()] = 1
-    
-    def pop_deferred_article(self) -> Optional[Article]:
-        try:
-            url = self._articles.popitem()[0]
-            return Article(url)
-        except KeyError:
-            return None  
 
 
 def load_random_article() -> Article:
