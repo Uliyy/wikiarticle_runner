@@ -7,8 +7,6 @@ import requests
 LOGFILE = "wikiarticle_runner.log"
 DEFERRED_ARTICLES_FILE = "deferred_articles.txt"
 
-deferred_articles: dict[str, int] = {}
-
 logging.basicConfig(filename=LOGFILE, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -30,6 +28,46 @@ class Article:
 
     def get_url(self) -> str:
         return self._url
+
+
+class BaseStorage:
+    def __init__(self):
+        pass
+
+    def done(self) -> None:
+        raise NotImplementedError("this method should be implemented in derived class")
+    
+    def defer_article(self, article: Article) -> None:
+        raise NotImplementedError("this method should be implemented in derived class")
+    
+    def pop_deferred_article(self) -> Optional[Article]:
+        raise NotImplementedError("this method should be implemented in derived class")
+
+
+class FileStorage(BaseStorage):
+    def __init__(self):
+        super().__init__()
+        try:
+            self._articles: dict[str, int] = {}
+            for line in open("deferred_articles.txt", "rt"):
+                self._articles[line[:-1]] = 1
+        except FileNotFoundError:
+            pass
+
+    def done(self):
+        f = open(DEFERRED_ARTICLES_FILE, "w")
+        f.writelines([key + "\n" for key in self._articles.keys()])
+        f.close()
+    
+    def defer_article(self, article: Article):
+        self._articles[article.get_url()] = 1
+    
+    def pop_deferred_article(self) -> Optional[Article]:
+        try:
+            url = self._articles.popitem()[0]
+            return Article(url)
+        except KeyError:
+            return None  
 
 
 def load_random_article() -> Article:
@@ -75,39 +113,7 @@ def user_choice(art_title: str) -> UserChoice:
             )
 
 
-def defer_article(article: Article):
-    deferred_articles[article.get_url()] = 1
-
-
-def pop_deferred_article() -> Optional[Article]:
-    try:
-        url = deferred_articles.popitem()[0]
-        return Article(url)
-    except KeyError:
-        return None
-
-
-def load_deferred_articles() -> dict[str, int]:
-    try:
-        f = open(DEFERRED_ARTICLES_FILE, "r")
-        d: dict[str, int] = {}
-        s = f.readline()
-        while s != "":
-            d[s[:-1]] = 1
-            s = f.readline()
-        f.close()
-        return d
-    except FileNotFoundError:
-        return {}
-
-
-def save_deferred_articles(d: dict[str, int]):
-    f = open(DEFERRED_ARTICLES_FILE, "w")
-    f.writelines([key + "\n" for key in d.keys()])
-    f.close()
-
-
-def main():
+def main(storage: BaseStorage):
     logger.debug("starting main()...")
     while True:
         article = load_random_article()
@@ -118,9 +124,9 @@ def main():
         if choice == UserChoice.SKIP:
             pass
         if choice == UserChoice.DEFER:
-            defer_article(article)
+            storage.defer_article(article)
         if choice == UserChoice.DEFERRED:
-            article2 = pop_deferred_article()
+            article2 = storage.pop_deferred_article()
             if article2 != None:
                 while True:
                     choice2 = input(
@@ -141,10 +147,12 @@ def main():
 
 
 if __name__ == "__main__":
+    storage = None
     try:
-        deferred_articles = load_deferred_articles()
-        main()
+        storage = FileStorage()
+        main(storage)
     except Exception as e:
         logger.error(e)
     finally:
-        save_deferred_articles(deferred_articles)
+        if storage != None:
+            storage.done()
